@@ -1,0 +1,148 @@
+---
+title: "Prepare data for LFI index"
+author: "Max Lindmark"
+date: today
+date-format: iso
+toc: true
+format: 
+  html:
+    page-layout: full
+    embed-resources: true
+knitr: 
+  opts_chunk:
+    fig.align: center
+    out-width: 100%
+editor: source
+---
+
+## Load libraries
+
+```{r load libraries}
+#| message: false
+#| warning: false
+
+# Load libraries
+library(tidyverse)
+library(tidylog)
+library(sdmTMB)
+library(marmap)
+
+home <- here::here()
+```
+
+## Prepare data for fitting models
+
+1. Go from Nhour to biomass/h using Lcl and LW parameters
+
+2. Indicator column with large or small (>38 or not)
+
+3. Summarise all biomass/h by haul and indicator column
+
+4. Join in all other columns using haul id
+
+5. Fit spatial model to standardize
+
+```{r}
+# Read data (prepared in creating_LFI_database.R)
+d <- read.csv(paste0(home, "/data/raw/Database_4species_new.csv")) |> 
+  janitor::clean_names() |> 
+  dplyr::select(-x) |> 
+  rename(ices_rect = e_urect)
+
+# Join in LW parameters so that I can go from abundance to biomass!
+lw <- tibble(
+  species = c("Clupea harengus", "Sprattus sprattus", "Gadus morhua", "Gasterosteus aculeatus"),
+  a = c(0.00550, 0.00550, 0.00676, 0.00977),
+  b = c(3.10, 3.10, 3.08, 3.09))
+
+# Join LW parameters with catch data
+d <- d |> left_join(lw, by = "species")
+
+# Calculate weight based on length and then kg/h
+d <- d |> 
+  mutate(haul_id = paste(date, haulno, sep = "."),
+         weight = (a*lcl^b) / 1000,
+         kg_hour = nhour * weight,
+         size_cut = ifelse(lcl > 38, "large", "small"))
+
+# Summarize total weight per haul
+d_all <- d |> summarise(tot_kg_hour = sum(kg_hour), .by = haul_id)
+
+d_large <- d |> summarise(tot_kg_hour = sum(kg_hour), .by = c(haul_id, size_cut)) |> 
+  filter(size_cut == "large") |> 
+  rename(large_tot_kg_hour = tot_kg_hour) |> 
+  dplyr::select(-size_cut)
+
+# From the original data, take only distinct haul id's
+d_haul <- d |> 
+  distinct(haul_id, .keep_all = TRUE) |> 
+  dplyr::select(year, haulno, date, haul_id, sub, ices_rect, lat, long,
+                times, period, bdepth, tdepth, gear, gear_type, utc) |> 
+  rename(sub_div = sub)
+
+# Join in data
+d_haul <- d_haul |> 
+  left_join(d_all, by = "haul_id") |> 
+  left_join(d_large, by = "haul_id")
+
+# Replace NA with 0 and calculate LFI (weight ratio of large fish to total catch)
+d_haul <- d_haul |> 
+  mutate(large_tot_kg_hour = replace_na(large_tot_kg_hour, 0),
+         tot_kg_hour = replace_na(tot_kg_hour, 0),
+         lfi = large_tot_kg_hour / tot_kg_hour)
+
+# Convert to decimal degrees and add UTM columns
+format.position <- function(x){
+  sign.x <- sign(x)
+  x <- abs(x)
+  x <- ifelse(nchar(x)==3, paste("0",x,sep=""), x)
+  x <- ifelse(nchar(x)==2, paste("00",x,sep=""), x)
+  x <- ifelse(nchar(x)==1, paste("000",x,sep=""), x)
+  dec.x <- as.numeric(paste(substring(x,1,2)))+as.numeric(paste(substring(x,3,4)))/60
+  dec.x <- sign.x*dec.x
+}
+
+# Apply function
+d_haul$lat <- format.position(d_haul$lat)
+d_haul$lon <- format.position(d_haul$lon)
+
+# ggplot(d_haul, aes(lon, lat)) + 
+#   geom_point()
+
+# Add UTM columns
+d_haul <- add_utm_columns(d_haul, ll_names = c("lon", "lat"))
+
+# Add marmap depth (to match with prediction grid)
+# depth_box <- getNOAA.bathy(min(d_haul$lon) - .1, max(d_haul$lon) + .1,
+#                            min(d_haul$lat) - .1, max(d_haul$lat) + .1)
+# 
+# d_haul$depth <- get.depth(depth_box, x = d_haul$lon, y = d_haul$lat, locator = F)$depth
+# 
+# # Convert to strictly positive values.
+# d_haul$depth <- d_haul$depth * (-1)
+
+# Add depth
+#https://emodnet.ec.europa.eu/geoviewer/#
+dep_raster1 <- terra::rast(paste0(home, "/data/depth/Mean depth in multi colour (no land).nc"))
+dep_raster2 <- terra::rast(paste0(home, "/data/depth/Mean depth in multi colour (no land).nc 2"))
+
+d_haul$depth1 <- terra::extract(dep_raster1, d_haul |> dplyr::select(lon, lat))$elevation
+d_haul$depth2 <- terra::extract(dep_raster2, d_haul |> dplyr::select(lon, lat))$elevation
+
+d_haul <- d_haul |> 
+  mutate(depth = depth1, 
+         depth = ifelse(is.na(depth), depth2, depth)) |> 
+  mutate(depth = depth*-1)
+
+# Save data for further analyses
+write_csv(d_haul, paste0(home, "/data/clean/lfi_data.csv"))
+```
+
+```{r}
+# Quick test to see haul id is unique here
+# d |> 
+#   summarise(sum = sum(kg_hour), .by = c(haul_id, species)) |> 
+#   mutate(id = paste(haul_id, species)) |> 
+#   summarise(n = n(), .by = id) |> 
+#   distinct(n)
+```
