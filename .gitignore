@@ -47,3 +47,11 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+data/shapefiles/
+data/raw/
+data/depth/
+index_test.R
+index-test-error.R
+test-index-error.R
+R/old/
