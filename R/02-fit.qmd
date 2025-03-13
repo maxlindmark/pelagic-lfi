@@ -40,6 +40,8 @@ home <- here::here()
 source(paste0(home, "/R/map-plot.R"))
 ```
 
+TODO: knitting error
+
 Read data and prediction grid, scale variables
 
 ```{r data}
@@ -53,6 +55,13 @@ d <- read_csv(paste0(home, "/data/clean/lfi_data.csv")) |>
          log_depth_sq = log_depth_sc^2,
          year = as.integer(year)) |> 
   filter(!year == 1991)
+
+names(d)
+
+t <- d |> drop_na(tdepth)
+t <- d |> drop_na(utc)
+
+d$utc
 
 pred_grid <- read_csv(paste0(home, "/data/clean/pred_grid.csv")) |> 
   drop_na(depth) |> 
@@ -93,7 +102,6 @@ p_mesh
 ```
 
 ```{r}
-#| cache: true
 fit1 <- sdmTMB(lfi ~ year_f + s(times, bs = "cc") + log_depth_sc + log_depth_sq,
                data = d,
                mesh = mesh,
@@ -128,10 +136,11 @@ AIC(fit1, fit2, fit3)
 ```
 
 ## Check residuals
+
 ```{r}
 # Residuals
 simulate(fit3, nsim = 500, type = "mle-mvn") |>
-  dharma_residuals(fit3, plot = FALSE) |> 
+  dharma_residuals(fit3, plot = FALSE) |>
   ggplot(aes(observed, expected)) +
   geom_point(color = "grey30", shape = 21, size = 0.5) +
   geom_abline(col = "tomato3", linewidth = 0.6) +
@@ -153,20 +162,71 @@ ind <- get_index(
   area = 1 / nrow(pred_grid |> filter(year == max(year)))
   )
 
-ggplot(ind, aes(year, est)) + 
-  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3) +
-  geom_line() + 
-  labs(y = "Predicted average LFI", x = "Year")
+# Fit trend model
+p1 <- ind |> 
+  mutate(period = ifelse(year > 2017, "New", "Old")) |> 
+  ggplot(aes(year, est, color = period, fill = period)) + 
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0) +
+  guides(color = "none", fill = "none") +
+  scale_color_brewer(palette = "Set1") +
+  geom_point(size = 2) +
+  labs(y = "Predicted average LFI", x = "Year") + 
+  theme(axis.title.x = element_blank()) +
+  annotate("text", label = "(a)", x = Inf, y = Inf, vjust = 2, hjust = 1.5,
+           color = "gray40", size = 4)
 
-ggsave(paste0(home, "/figures/lfi_index.pdf"), width = 15, height = 11, units = "cm")
+options(scipen=999)
 
-# Starting in 1985
-# ind |> 
-#   filter(year >= 1985) |> 
-#   ggplot(aes(year, est)) + 
-#   geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3) +
-#   geom_line() + 
-#   labs(y = "Predicted average LFI", x = "Year")
+# Trend lines
+ind2 <- ind |> 
+  filter(year > 2017) |> 
+  mutate(cv = se / est,
+         weight = 1/cv,
+         weights_cs = weight / mean(weight),
+         year_sc = (year - mean(year)) / sd(year),
+         est_sc = est)
+
+mt <- sdmTMB(est_sc ~ year_sc,
+             family = Gamma(link = "log"),
+             spatial = "off", 
+             #weights = weights$weights_cs,
+             data = ind2)
+
+mt
+sanity(mt)
+tidy(mt)
+tidy(mt, exponentiate = TRUE)
+
+nd <- tibble(year = seq(min(ind2$year), max(ind2$year), length.out = 50)) |> 
+  mutate(year_sc = (year - mean(year)) / sd(year))
+
+pp <- predict(mt, newdata = nd, se_fit = TRUE) |> 
+  mutate(est = est) |> 
+  mutate(lwr = exp(est - est_se*1.96),
+         upr = exp(est + est_se*1.96),
+         est = exp(est))
+
+p2 <- ind |> 
+  filter(year > 2017) |> 
+  mutate(period = ifelse(year > 2017, "New", "Old")) |> 
+  ggplot(aes(year, est, color = period, fill = period)) + 
+  geom_line(data = pp, aes(year, est), inherit.aes = FALSE,
+            color = brewer.pal(n = 3, name = "Set1")[1], 
+            linetype = "longdash") +
+  geom_ribbon(data = pp, aes(year, est, ymin = lwr, ymax = upr), inherit.aes = FALSE,
+              alpha = 0.2) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1", direction = -1) +
+  scale_fill_brewer(palette = "Set1", direction = -1) +
+  guides(color = "none", fill = "none") +
+  labs(y = "Predicted average LFI", x = "Year") +
+  annotate("text", label = "(b)", x = Inf, y = Inf, vjust = 2, hjust = 1.5,
+           color = "gray40", size = 4)
+
+(p1 / p2) + plot_layout(axes = "collect")
+
+ggsave(paste0(home, "/figures/lfi_index.pdf"), width = 14, height = 17, units = "cm")
 ```
 
 ## Make map plots
@@ -230,5 +290,48 @@ bind_rows(
   labs(y = "Predicted average LFI", x = "Year")
 ```
 
+Fit with trawl depth
+
+```{r}
+fit3b <- sdmTMB(lfi ~ 1 + s(times, bs = "cc") + log_depth_sc + tdepth,
+                data = d,
+                mesh = mesh,
+                time_varying = ~ 1,
+                time_varying_type = "rw0",
+                family = delta_gamma(),
+                extra_time = c(1991, 1993, 1997), 
+                spatiotemporal = "iid",
+                spatial = "on",
+                time = "year")
+
+sanity(fit3b)
+
+# Get index
+p3 <- predict(fit3b,
+              newdata = pred_grid |> mutate(tdepth = mean(d$tdepth, na.rm = TRUE)),
+              return_tmb_object = TRUE)
+
+ind3 <- get_index(
+  p3, 
+  bias_correct = FALSE, 
+  area = 1 / nrow(pred_grid |>
+                    filter(year == max(year)))
+  )
+
+bind_rows(
+  ind |> mutate(prediction = "full"),
+  ind2 |> mutate(prediction = "subset"),
+  ind3 |> mutate(prediction = "tdepth")
+  ) |>
+  ggplot(aes(year, est, color = prediction, fill = prediction)) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, color = NA) +
+  geom_line() + 
+  scale_y_continuous(trans = "sqrt") +
+  scale_color_brewer(palette = "Set2") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(y = "Predicted average LFI", x = "Year")
+
+ggsave(paste0(home, "/figures/lfi_index_sensi.pdf"), width = 14, height = 11, units = "cm")
+```
 
 

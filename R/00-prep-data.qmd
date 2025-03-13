@@ -68,7 +68,8 @@ d <- d |>
 # Summarize total weight per haul
 d_all <- d |> summarise(tot_kg_hour = sum(kg_hour), .by = haul_id)
 
-d_large <- d |> summarise(tot_kg_hour = sum(kg_hour), .by = c(haul_id, size_cut)) |> 
+d_large <- d |>
+  summarise(tot_kg_hour = sum(kg_hour), .by = c(haul_id, size_cut)) |> 
   filter(size_cut == "large") |> 
   rename(large_tot_kg_hour = tot_kg_hour) |> 
   dplyr::select(-size_cut)
