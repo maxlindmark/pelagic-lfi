@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Max Lindmark">
-<meta name="dcterms.date" content="2025-02-20">
+<meta name="dcterms.date" content="2025-05-14">
 
 <title>Prepare data for LFI index</title>
 <style>
@@ -3093,7 +3093,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">2025-02-20</p>
+      <p class="date">2025-05-14</p>
     </div>
   </div>
   
@@ -3166,7 +3166,7 @@ vertical-align: -.125em;
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">haul_id =</span> <span class="fu">paste</span>(date, haulno, <span class="at">sep =</span> <span class="st">&quot;.&quot;</span>),</span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">weight =</span> (a<span class="sc">*</span>lcl<span class="sc">^</span>b) <span class="sc">/</span> <span class="dv">1000</span>,</span>
 <span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">kg_hour =</span> nhour <span class="sc">*</span> weight,</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">size_cut =</span> <span class="fu">ifelse</span>(lcl <span class="sc">&gt;</span> <span class="dv">38</span>, <span class="st">&quot;large&quot;</span>, <span class="st">&quot;small&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">size_cut =</span> <span class="fu">ifelse</span>(lcl <span class="sc">&gt;</span> <span class="dv">30</span>, <span class="st">&quot;large&quot;</span>, <span class="st">&quot;small&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>mutate: new variable &#39;haul_id&#39; (character) with 2,107 unique values and 0% NA</code></pre>
 </div>
@@ -3184,15 +3184,16 @@ vertical-align: -.125em;
 <div class="cell-output cell-output-stderr">
 <pre><code>summarise: now 2,107 rows and 2 columns, ungrouped</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>d_large <span class="ot">&lt;-</span> d <span class="sc">|&gt;</span> <span class="fu">summarise</span>(<span class="at">tot_kg_hour =</span> <span class="fu">sum</span>(kg_hour), <span class="at">.by =</span> <span class="fu">c</span>(haul_id, size_cut)) <span class="sc">|&gt;</span> </span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(size_cut <span class="sc">==</span> <span class="st">&quot;large&quot;</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">large_tot_kg_hour =</span> tot_kg_hour) <span class="sc">|&gt;</span> </span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>size_cut)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>d_large <span class="ot">&lt;-</span> d <span class="sc">|&gt;</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">tot_kg_hour =</span> <span class="fu">sum</span>(kg_hour), <span class="at">.by =</span> <span class="fu">c</span>(haul_id, size_cut)) <span class="sc">|&gt;</span> </span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(size_cut <span class="sc">==</span> <span class="st">&quot;large&quot;</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">large_tot_kg_hour =</span> tot_kg_hour) <span class="sc">|&gt;</span> </span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>size_cut)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>summarise: now 2,854 rows and 3 columns, ungrouped</code></pre>
+<pre><code>summarise: now 2,967 rows and 3 columns, ungrouped</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>filter: removed 2,107 rows (74%), 747 rows remaining</code></pre>
+<pre><code>filter: removed 2,107 rows (71%), 860 rows remaining</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>rename: renamed one variable (large_tot_kg_hour)</code></pre>
@@ -3235,13 +3236,13 @@ vertical-align: -.125em;
 <pre><code>left_join: added one column (large_tot_kg_hour)</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>           &gt; rows only in x   1,360</code></pre>
+<pre><code>           &gt; rows only in x   1,247</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>           &gt; rows only in y  (    0)</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>           &gt; matched rows       747</code></pre>
+<pre><code>           &gt; matched rows       860</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>           &gt;                 =======</code></pre>
@@ -3255,10 +3256,10 @@ vertical-align: -.125em;
 <span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">tot_kg_hour =</span> <span class="fu">replace_na</span>(tot_kg_hour, <span class="dv">0</span>),</span>
 <span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">lfi =</span> large_tot_kg_hour <span class="sc">/</span> tot_kg_hour)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>mutate: changed 1,360 values (65%) of &#39;large_tot_kg_hour&#39; (1360 fewer NA)</code></pre>
+<pre><code>mutate: changed 1,247 values (59%) of &#39;large_tot_kg_hour&#39; (1247 fewer NA)</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>        new variable &#39;lfi&#39; (double) with 748 unique values and 0% NA</code></pre>
+<pre><code>        new variable &#39;lfi&#39; (double) with 861 unique values and 0% NA</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to decimal degrees and add UTM columns</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>format.position <span class="ot">&lt;-</span> <span class="cf">function</span>(x){</span>

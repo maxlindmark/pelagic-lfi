@@ -63,7 +63,7 @@ d <- d |>
   mutate(haul_id = paste(date, haulno, sep = "."),
          weight = (a*lcl^b) / 1000,
          kg_hour = nhour * weight,
-         size_cut = ifelse(lcl > 38, "large", "small"))
+         size_cut = ifelse(lcl > 30, "large", "small"))
 
 # Summarize total weight per haul
 d_all <- d |> summarise(tot_kg_hour = sum(kg_hour), .by = haul_id)

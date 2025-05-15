@@ -40,8 +40,6 @@ home <- here::here()
 source(paste0(home, "/R/map-plot.R"))
 ```
 
-TODO: knitting error
-
 Read data and prediction grid, scale variables
 
 ```{r data}
